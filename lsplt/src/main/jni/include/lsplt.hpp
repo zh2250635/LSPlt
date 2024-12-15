@@ -112,6 +112,7 @@ struct MapInfo {
 /// determine which hook fails by checking the backup function pointer of #RegisterHook().
 /// \see #RegisterHook()
 [[maybe_unused, gnu::visibility("default")]] bool CommitHook();
+[[maybe_unused, gnu::visibility("default")]] bool CommitHook(std::vector<MapInfo> &maps);
 
 /// \brief Invalidate backup memory regions
 /// Normally LSPlt will backup the hooked memory region and do hook on a copied anonymous memory
