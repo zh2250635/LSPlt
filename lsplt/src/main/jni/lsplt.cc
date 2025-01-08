@@ -15,14 +15,15 @@
 #include "syscall.hpp"
 
 namespace {
-const uintptr_t kPageSize = getpagesize();
 
 inline auto PageStart(uintptr_t addr) {
-    return reinterpret_cast<char *>(addr / kPageSize * kPageSize);
+    const uintptr_t page_size = getpagesize();
+    return reinterpret_cast<char *>(addr / page_size * page_size);
 }
 
 inline auto PageEnd(uintptr_t addr) {
-    return reinterpret_cast<char *>(reinterpret_cast<uintptr_t>(PageStart(addr)) + kPageSize);
+    const uintptr_t page_size = getpagesize();
+    return reinterpret_cast<char *>(reinterpret_cast<uintptr_t>(PageStart(addr)) + page_size);
 }
 
 struct RegisterInfo {
@@ -79,7 +80,7 @@ public:
     }
 
     // filter out ignored
-    void Filter(const std::list<RegisterInfo> &register_info) {
+    void Filter(const std::vector<RegisterInfo> &register_info) {
         for (auto iter = begin(); iter != end();) {
             const auto &info = iter->second;
             bool matched = false;
@@ -102,6 +103,7 @@ public:
 
     void Merge(HookInfos &old) {
         // merge with old map info
+        if (old.size() == 0) return;
         for (auto &info : old) {
             if (info.second.backup) {
                 erase(info.second.backup);
@@ -144,10 +146,13 @@ public:
                 new_addr == MAP_FAILED) {
                 return false;
             }
+            const uintptr_t page_size = getpagesize();
             for (uintptr_t src = reinterpret_cast<uintptr_t>(backup_addr), dest = info.start,
                            end = info.start + len;
-                 dest < end; src += kPageSize, dest += kPageSize) {
-                memcpy(reinterpret_cast<void *>(dest), reinterpret_cast<void *>(src), kPageSize);
+                 dest < end; src += page_size, dest += page_size) {
+                LOGD("memcpy %p to %p: %zu", reinterpret_cast<void *>(src),
+                     reinterpret_cast<void *>(dest), page_size);
+                memcpy(reinterpret_cast<void *>(dest), reinterpret_cast<void *>(src), page_size);
             }
             info.backup = reinterpret_cast<uintptr_t>(backup_addr);
         }
@@ -173,8 +178,7 @@ public:
         if (info.hooks.empty() && !info.self) {
             LOGD("Restore %p from %p", reinterpret_cast<void *>(info.start),
                  reinterpret_cast<void *>(info.backup));
-            // Note that we have to always use sys_mremap here,
-            // see
+            // Note that we have to always use sys_mremap here, see
             // https://cs.android.com/android/_/android/platform/bionic/+/4200e260d266fd0c176e71fbd720d0bab04b02db
             if (auto *new_addr =
                     sys_mremap(reinterpret_cast<void *>(info.backup), len, len,
@@ -187,7 +191,7 @@ public:
         return true;
     }
 
-    bool DoHook(std::list<RegisterInfo> &register_info) {
+    bool DoHook(std::vector<RegisterInfo> &register_info) {
         bool res = true;
         for (auto info_iter = rbegin(); info_iter != rend(); ++info_iter) {
             auto &info = info_iter->second;
@@ -243,7 +247,7 @@ public:
 };
 
 std::mutex hook_mutex;
-std::list<RegisterInfo> register_info;
+std::vector<RegisterInfo> register_info = {};
 HookInfos hook_info;
 }  // namespace
 
