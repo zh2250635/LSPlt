@@ -402,7 +402,8 @@ public:
     bool RestoreFunction(std::vector<HookRequest> &register_info) {
         LOGV("Restoring %zu functions", register_info.size());
         bool res = true;
-        for (auto &reg : register_info) {
+        for (auto iter = register_info.begin(); iter != register_info.end();) {
+            const auto &reg = *iter;
             bool restored = false;
             for (auto info_iter = rbegin(); info_iter != rend(); ++info_iter) {
                 auto &info = info_iter->second;
@@ -424,9 +425,15 @@ public:
 
             if (!restored) {
                 LOGW("No matched hook found to restore function [%s]", reg.symbol.c_str());
+                ++iter;
+            } else {
+                iter = register_info.erase(iter);
             }
         }
-
+        if (!res) {
+            LOGV("Fallback to address searching for %zu functions not restored",
+                 register_info.size());
+        }
         return res;
     }
 
