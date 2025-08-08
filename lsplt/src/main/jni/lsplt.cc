@@ -450,11 +450,18 @@ public:
 
                 if (!info.elf) info.elf = std::make_unique<Elf>(info.start);
                 if (info.elf && info.elf->Valid()) {
-                    LOGD("Hooking %s", iter->symbol.data());
-                    for (auto addr : info.elf->FindPltAddr(reg.symbol)) {
-                        res = PatchPLTEntry(addr, reinterpret_cast<uintptr_t>(reg.callback),
-                                            reinterpret_cast<uintptr_t *>(reg.backup)) &&
-                              res;
+                    LOGD("Finding symbol %s", iter->symbol.data());
+                    auto possible_addr = info.elf->FindPltAddr(reg.symbol);
+                    if (possible_addr.size() == 0) {
+                        LOGW("Symbol %s not found in PLT table", iter->symbol.data());
+                        res = false;
+                    } else {
+                        LOGD("Patching PLT entry for %s", iter->symbol.data());
+                        for (auto addr : possible_addr) {
+                            res = PatchPLTEntry(addr, reinterpret_cast<uintptr_t>(reg.callback),
+                                                reinterpret_cast<uintptr_t *>(reg.backup)) &&
+                                  res;
+                        }
                     }
                 }
                 iter = register_info.erase(iter);
