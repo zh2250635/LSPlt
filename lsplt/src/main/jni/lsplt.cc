@@ -206,7 +206,7 @@ public:
                 }
             }
             if (matched) {
-                LOGV("Match hook info %s:%lu %" PRIxPTR " %" PRIxPTR "-%" PRIxPTR,
+                LOGV("match hook info %s:%lu %" PRIxPTR " %" PRIxPTR "-%" PRIxPTR,
                      iter->second.path.data(), iter->second.inode, iter->second.start,
                      iter->second.end, iter->second.offset);
                 ++iter;
@@ -301,7 +301,7 @@ public:
      */
 
     bool PatchPLTEntry(uintptr_t addr, uintptr_t callback, uintptr_t *backup) {
-        LOGV("Hooking %p", reinterpret_cast<void *>(addr));
+        LOGV("hooking %p", reinterpret_cast<void *>(addr));
         auto iter = lower_bound(addr);
         if (iter == end()) return false;
         // iter.first < addr
@@ -311,7 +311,7 @@ public:
         if (!info.backup && !info.self) {
             // let os find a suitable address
             auto *backup_addr = sys_mmap(nullptr, len, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
-            LOGD("Backup %p to %p", reinterpret_cast<void *>(addr), backup_addr);
+            LOGD("backup %p to %p", reinterpret_cast<void *>(addr), backup_addr);
             if (backup_addr == MAP_FAILED) return false;
             if (auto *new_addr =
                     sys_mremap(reinterpret_cast<void *>(info.start), len, len,
@@ -322,7 +322,7 @@ public:
                 if (new_addr == MAP_FAILED || new_addr != backup_addr) {
                     return false;
                 }
-                LOGD("Backup with MREMAP_DONTUNMAP failed, tried without it");
+                LOGD("backup with MREMAP_DONTUNMAP failed, tried without it");
             }
             if (auto *new_addr = sys_mmap(reinterpret_cast<void *>(info.start), len,
                                           PROT_READ | PROT_WRITE | info.perms,
@@ -334,8 +334,6 @@ public:
             for (uintptr_t src = reinterpret_cast<uintptr_t>(backup_addr), dest = info.start,
                            end = info.start + len;
                  dest < end; src += page_size, dest += page_size) {
-                // LOGD("memcpy %p to %p: %zu", reinterpret_cast<void *>(src),
-                //      reinterpret_cast<void *>(dest), page_size);
                 memcpy(reinterpret_cast<void *>(dest), reinterpret_cast<void *>(src), page_size);
             }
             info.backup = reinterpret_cast<uintptr_t>(backup_addr);
@@ -360,7 +358,7 @@ public:
             info.hooks.emplace(addr, the_backup);
         }
         if (info.hooks.empty() && !info.self) {
-            LOGD("Restore %p from %p", reinterpret_cast<void *>(info.start),
+            LOGV("restore %p from %p", reinterpret_cast<void *>(info.start),
                  reinterpret_cast<void *>(info.backup));
             // Note that we have to always use sys_mremap here, see
             // https://cs.android.com/android/_/android/platform/bionic/+/4200e260d266fd0c176e71fbd720d0bab04b02db
@@ -400,7 +398,7 @@ public:
      *    This writes the original function pointer back, undoing the hook.
      */
     bool RestoreFunction(std::vector<HookRequest> &register_info) {
-        LOGV("Restoring %zu functions", register_info.size());
+        LOGV("restoring %zu functions", register_info.size());
         bool res = true;
         for (auto iter = register_info.begin(); iter != register_info.end();) {
             const auto &reg = *iter;
@@ -414,7 +412,7 @@ public:
                     // The `hooked_addr` is the Key: the address of the PLT entry.
                     // The `original_addr` is the Value: the original function ptr we backed up.
                     if (original_addr == reinterpret_cast<uintptr_t>(reg.callback)) {
-                        LOGD("Found matching hook for symbol [%s] at address %p.",
+                        LOGV("found matching hook for symbol [%s] at address %p.",
                              reg.symbol.c_str(), reinterpret_cast<void *>(hooked_addr));
                         restored = PatchPLTEntry(hooked_addr, original_addr, nullptr);
                         res = restored && res;
@@ -424,14 +422,14 @@ public:
             }
 
             if (!restored) {
-                LOGW("No matched hook found to restore function [%s]", reg.symbol.c_str());
+                LOGW("no matched hook found to restore function [%s]", reg.symbol.c_str());
                 ++iter;
             } else {
                 iter = register_info.erase(iter);
             }
         }
         if (!res) {
-            LOGV("Fallback to address searching for %zu functions not restored",
+            LOGV("fallback to address searching for %zu functions not restored",
                  register_info.size());
         }
         return res;
@@ -450,13 +448,13 @@ public:
 
                 if (!info.elf) info.elf = std::make_unique<Elf>(info.start);
                 if (info.elf && info.elf->Valid()) {
-                    LOGD("Finding symbol %s", iter->symbol.data());
+                    LOGV("finding symbol %s", iter->symbol.data());
                     auto possible_addr = info.elf->FindPltAddr(reg.symbol);
                     if (possible_addr.size() == 0) {
-                        LOGW("Symbol %s not found in PLT table", iter->symbol.data());
+                        LOGW("symbol %s not found in PLT table", iter->symbol.data());
                         res = false;
                     } else {
-                        LOGD("Patching PLT entry for %s", iter->symbol.data());
+                        LOGV("patching PLT entry for %s", iter->symbol.data());
                         for (auto addr : possible_addr) {
                             res = PatchPLTEntry(addr, reinterpret_cast<uintptr_t>(reg.callback),
                                                 reinterpret_cast<uintptr_t *>(reg.backup)) &&
@@ -511,7 +509,6 @@ namespace lsplt::inline v2 {
     constexpr static auto kMapEntry = 7;
     std::vector<MapInfo> info;
     auto path = "/proc/" + std::string{pid} + "/maps";
-    // LOGW("Reading file %s is detectable by the process", path.c_str());
     auto maps = std::unique_ptr<FILE, decltype(&fclose)>{fopen(path.c_str(), "r"), &fclose};
     if (maps) {
         char *line = nullptr;
