@@ -78,6 +78,12 @@ struct HookRequest {
     std::string symbol;
     void *callback;
     void **backup;
+
+    // C++17 兼容性构造函数
+    HookRequest(dev_t d, ino_t i, std::pair<uintptr_t, uintptr_t> range,
+                std::string sym, void* cb, void** bk)
+        : dev(d), inode(i), offset_range(range), symbol(std::move(sym)),
+          callback(cb), backup(bk) {}
 };
 
 /*
@@ -503,7 +509,8 @@ std::vector<HookRequest> g_pending_hooks = {};
 HookInfos g_global_hook_state;
 }  // namespace
 
-namespace lsplt::inline v2 {
+namespace lsplt {
+namespace v2 {  // C++17: 普通 namespace 替代 inline namespace
 [[maybe_unused]] std::vector<MapInfo> MapInfo::Scan(std::string_view pid) {
     constexpr static auto kPermLength = 5;
     constexpr static auto kMapEntry = 7;
@@ -601,4 +608,5 @@ namespace lsplt::inline v2 {
     const std::unique_lock lock(g_hook_state_mutex);
     return g_global_hook_state.CleanupAllHooks();
 }
-}  // namespace lsplt::inline v2
+}  // namespace v2
+}  // namespace lsplt

@@ -8,7 +8,7 @@
 
 /// \namespace lsplt
 namespace lsplt {
-inline namespace v2 {
+namespace v2 {  // C++17: 普通 namespace 替代 inline namespace
 
 /// \struct MapInfo
 /// \brief An entry that describes a line in /proc/self/maps. You can obtain a list of these entries
@@ -35,6 +35,12 @@ struct MapInfo {
     ino_t inode;
     /// \brief The path of the memory region.
     std::string path;
+
+    // C++17 兼容性构造函数
+    MapInfo(uintptr_t s, uintptr_t e, uint8_t p, bool priv, uintptr_t off,
+            dev_t d, ino_t i, std::string pth)
+        : start(s), end(e), perms(p), is_private(priv), offset(off),
+          dev(d), inode(i), path(std::move(pth)) {}
 
     /// \brief Scans /proc/self/maps and returns a list of \ref MapInfo entries.
     /// This is useful to find out the inode of the library to hook.
@@ -126,4 +132,8 @@ struct MapInfo {
 /// \see #RegisterHook()
 [[maybe_unused, gnu::visibility("default")]] bool InvalidateBackup();
 }  // namespace v2
+
+// C++17 兼容性：使 v2 命名空间的符号在 lsplt 命名空间中可见
+using namespace v2;
+
 }  // namespace lsplt
